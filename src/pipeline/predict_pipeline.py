@@ -1,8 +1,10 @@
 import sys
 import os
+import json
 import pandas as pd
 from src.exception import CustomException
 from src.utils import load_object
+from src.db_config import get_db_connection
 
 
 class PredictPipeline:
@@ -19,12 +21,28 @@ class PredictPipeline:
             print("After Loading")
             data_scaled=preprocessor.transform(features)
             preds=model.predict(data_scaled)
+            self.save_predictions_to_db(features, preds)
             return preds
         
         except Exception as e:
             raise CustomException(e,sys)
 
-
+    def save_predictions_to_db(self, features, predictions):
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            for feature, pred in zip(features.values, predictions):
+                feature_json = json.dumps(feature.tolist())
+                cursor.execute(
+                    "INSERT INTO predictions (features, prediction_value) VALUES (%s, %s)",
+                    (feature_json, pred)
+                )
+            conn.commit()
+            cursor.close()
+            conn.close()
+        
+        except Exception as e:
+            raise CustomException(e, sys)
 
 class CustomData:
     def __init__(  self,
